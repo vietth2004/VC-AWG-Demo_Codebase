@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Tạo Axios instance với cấu hình mặc định
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ axiosInstance.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && error.config?.url !== '/auth/login') {
       // Token hết hạn hoặc không hợp lệ
       localStorage.removeItem('token')
       localStorage.removeItem('user')

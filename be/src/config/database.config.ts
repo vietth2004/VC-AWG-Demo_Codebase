@@ -5,14 +5,13 @@ export default registerAs(
   'database',
   (): TypeOrmModuleOptions => ({
     type: 'mysql',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
-    username: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || 'trucdang02',
-    database: process.env.DB_DATABASE || 'financial1',
+    host: process.env.DB_HOST ?? 'localhost',
+    port: parseInt(process.env.DB_PORT ?? '3306', 10),
+    username: process.env.DB_USERNAME ?? 'root',
+    password: process.env.DB_PASSWORD ?? '',
+    database: process.env.DB_DATABASE ?? 'financial1',
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     synchronize: false, // Database đã được tạo sẵn, không tự động sync
     logging: process.env.NODE_ENV === 'development',
   }),
 );
-

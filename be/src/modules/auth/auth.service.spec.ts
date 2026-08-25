@@ -21,4 +21,13 @@ describe('AuthService', () => {
       }),
     ).rejects.toThrow('Bad Request / Please provide a valid email address.');
   });
+
+  it('rejects login with invalid email', async () => {
+    await expect(
+      authService.login({
+        email: 'invalid-email',
+        password: 'Password123!',
+      }),
+    ).rejects.toThrow('Bad Request / Please provide a valid email address.');
+  });
 });

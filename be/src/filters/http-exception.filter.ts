@@ -21,6 +21,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ? exception.getResponse()
       : undefined;
     const message = this.getMessage(exceptionResponse, status);
+    
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      const log = '🔥 GLOBAL UNHANDLED ERROR: ' + (exception instanceof Error ? exception.stack : JSON.stringify(exception)) + '\n';
+      console.error(log);
+      require('fs').appendFileSync('error.log', new Date().toISOString() + ' ' + log);
+    }
 
     response.status(status).json({
       success: false,

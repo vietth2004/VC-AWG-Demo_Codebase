@@ -11,7 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { isEmail } from 'class-validator';
-import { randomUUID } from 'crypto';
+
 import { QueryFailedError, Repository } from 'typeorm';
 import { User } from '../user/user.entity';
 import { LoginDto } from './dto/login.dto';
@@ -82,6 +82,8 @@ export class AuthService {
         },
       };
     } catch (error) {
+      console.error('Register Error:', error);
+      require('fs').appendFileSync('error.log', new Date().toISOString() + ' Register Error: ' + (error.stack || error.message || error) + '\n');
       if (queryRunner.isTransactionActive) {
         await queryRunner.rollbackTransaction();
       }
@@ -105,12 +107,20 @@ export class AuthService {
     const login = this.validateAndNormalizeLogin(loginDto);
 
     try {
-      const user = await this.userRepository
-        .createQueryBuilder('user')
-        .where('LOWER(TRIM(user.email)) = :email', { email: login.email })
-        .getOne();
+      console.log(`[AuthService.login] Attempting login for email: "${login.email}"`);
+      const user = await this.userRepository.findOne({
+        where: { email: login.email },
+      });
 
-      if (!user || !(await bcrypt.compare(login.password, user.password))) {
+      if (!user) {
+        console.warn(`[AuthService.login] User not found with email: "${login.email}"`);
+        throw new UnauthorizedException('Email or password is incorrect.');
+      }
+
+      const isPasswordValid = await bcrypt.compare(login.password, user.password);
+      console.log(`[AuthService.login] Password validation for "${login.email}":`, isPasswordValid ? 'VALID' : 'INVALID');
+
+      if (!isPasswordValid) {
         throw new UnauthorizedException('Email or password is incorrect.');
       }
 
@@ -129,6 +139,7 @@ export class AuthService {
         },
       };
     } catch (error) {
+      console.error('Login Error:', error);
       if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
         throw error;
       }
@@ -212,7 +223,7 @@ export class AuthService {
     const emailPrefix = email.split('@')[0] || 'user';
     const base = emailPrefix.slice(0, 218);
 
-    return `${base}-${randomUUID()}`;
+    return `${base}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   }
 
   /** Signs a JWT only after the user has been persisted within the transaction. */

@@ -4,6 +4,7 @@ import {
   HttpException,
   Injectable,
   InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -13,10 +14,16 @@ import { isEmail } from 'class-validator';
 import { randomUUID } from 'crypto';
 import { QueryFailedError, Repository } from 'typeorm';
 import { User } from '../user/user.entity';
+import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 interface NormalizedRegistration {
   fullName: string;
+  email: string;
+  password: string;
+}
+
+interface NormalizedLogin {
   email: string;
   password: string;
 }
@@ -93,6 +100,43 @@ export class AuthService {
     }
   }
 
+  /** Authenticates valid credentials and returns only the safe session payload. */
+  async login(loginDto: LoginDto) {
+    const login = this.validateAndNormalizeLogin(loginDto);
+
+    try {
+      const user = await this.userRepository
+        .createQueryBuilder('user')
+        .where('LOWER(TRIM(user.email)) = :email', { email: login.email })
+        .getOne();
+
+      if (!user || !(await bcrypt.compare(login.password, user.password))) {
+        throw new UnauthorizedException('Email or password is incorrect.');
+      }
+
+      const accessToken = await this.signAccessToken(user);
+
+      return {
+        success: true,
+        message: 'Successful Login',
+        data: {
+          accessToken,
+          user: {
+            id: user.userId,
+            fullName: user.fullName,
+            email: user.email,
+          },
+        },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Internal Server Error');
+    }
+  }
+
   /** Enforces BR-REG-01, BR-REG-02, BR-REG-04, BR-REG-05, and BR-REG-06. */
   private validateAndNormalizeRegistration(registerDto: RegisterDto): NormalizedRegistration {
     const fullName = this.normalize(registerDto.fullName);
@@ -136,6 +180,21 @@ export class AuthService {
     }
 
     return { fullName, email, password };
+  }
+
+  /** Enforces BR-LOG-01 and BR-LOG-02 before attempting authentication. */
+  private validateAndNormalizeLogin(loginDto: LoginDto): NormalizedLogin {
+    const email = this.normalize(loginDto.email).toLowerCase();
+
+    if (!email || !this.isValidEmail(email)) {
+      throw new BadRequestException('Bad Request / Please provide a valid email address.');
+    }
+
+    if (!loginDto.password) {
+      throw new BadRequestException('Bad Request / Password is required.');
+    }
+
+    return { email, password: loginDto.password };
   }
 
   /** Applies NFC and trim normalization required before validation and storage. */

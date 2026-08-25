@@ -19,7 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate('/login')
   }
 
-  if (location.pathname === '/register') {
+  if (location.pathname === '/login' || location.pathname === '/register') {
     return <>{children}</>
   }
 

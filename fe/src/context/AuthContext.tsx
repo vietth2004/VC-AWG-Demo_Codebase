@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
   updateUser: (userData: User) => void
 }
@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Kiểm tra token khi component mount
+  /** Restores a previously stored authentication session at application startup. */
   useEffect(() => {
     const token = localStorage.getItem('token')
     const savedUser = localStorage.getItem('user')
@@ -26,7 +26,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const userData = JSON.parse(savedUser)
         setUser(userData)
-        // Có thể gọi API để verify token và lấy user mới nhất
       } catch (error) {
         console.error('Error parsing user data:', error)
         localStorage.removeItem('token')
@@ -36,27 +35,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(false)
   }, [])
 
-  const login = async (username: string, password: string) => {
-    try {
-      const response = await authService.login({ username, password })
-      if (response.success && response.data) {
-        const { user: userData, token } = response.data
-        localStorage.setItem('token', token)
-        localStorage.setItem('user', JSON.stringify(userData))
-        setUser(userData)
-      } else {
-        throw new Error(response.message || 'Đăng nhập thất bại')
-      }
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Đăng nhập thất bại')
+  /** Authenticates through the public API and persists the mapped user session. */
+  const login = async (email: string, password: string) => {
+    const response = await authService.login({
+      email: email.trim().toLowerCase(),
+      password,
+    })
+
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Login failed. Please try again.')
     }
+
+    const mappedUser: User = {
+      user_id: response.data.user.id,
+      full_name: response.data.user.fullName,
+      email: response.data.user.email,
+      username: '',
+      total_balance: 0,
+    }
+
+    localStorage.setItem('token', response.data.accessToken)
+    localStorage.setItem('user', JSON.stringify(mappedUser))
+    setUser(mappedUser)
   }
 
+  /** Clears the authentication state for the current browser session. */
   const logout = () => {
     authService.logout()
     setUser(null)
   }
 
+  /** Replaces the in-memory user and keeps the persisted user in sync. */
   const updateUser = (userData: User) => {
     setUser(userData)
     localStorage.setItem('user', JSON.stringify(userData))
@@ -85,4 +94,3 @@ export const useAuth = () => {
   }
   return context
 }
-
